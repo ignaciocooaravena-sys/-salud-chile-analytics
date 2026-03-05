@@ -1,0 +1,206 @@
+# Análisis de Establecimientos de Salud en Chile
+# Archivo: salud_chile_analytics.Rmd
+# Autor: Ignacio Coo Aravena
+# Fecha: Marzo 2026
+#
+# Este archivo contiene el bloque de código adicional para el análisis
+# de densidad de establecimientos per cápita por región.
+#
+# Instrucción: Insertar este bloque después del análisis de tipos de
+# establecimiento y antes de la cobertura de urgencia.
+
+## -------------------------------------------------------------------
+## ANÁLISIS ADICIONAL: DENSIDAD DE ESTABLECIMIENTOS PER CÁPITA
+## -------------------------------------------------------------------
+
+# Datos de población por región (Censo 2024 - INE)
+# Fuente: INE, Censo de Población y Vivienda 2024
+# Última actualización: Marzo 2025
+
+poblacion_region <- tibble::tribble(
+  ~region_censo,                           ~poblacion_2024,
+  "Arica y Parinacota",                    244569,
+  "Tarapacá",                                369806,
+  "Antofagasta",                            663201,
+  "Atacama",                                308060,
+  "Coquimbo",                               817619,
+  "Valparaíso",                             1896053,
+  "Metropolitana de Santiago",              7400741,
+  "O'Higgins",                              978132,
+  "Maule",                                  1103487,
+  "Ñuble",                                   508865,
+  "Biobío",                                 1613059,
+  "La Araucanía",                           1027264,
+  "Los Ríos",                                401478,
+  "Los Lagos",                              891440,
+  "Aysén del General Carlos Ibáñez del Campo", 103158,
+  "Magallanes y de la Antártica Chilena",   178500
+)
+
+# Preparar datos de establecimientos para el join
+# Crear tabla de equivalencias para normalizar nombres de regiones
+
+equivalencias_regiones <- tibble::tribble(
+  ~region_abrev_match,                 ~region_censo,
+  "Arica Parinacota",                  "Arica y Parinacota",
+  "Tarapacá",                            "Tarapacá",
+  "Antofagasta",                        "Antofagasta",
+  "Atacama",                            "Atacama",
+  "Coquimbo",                           "Coquimbo",
+  "Valparaíso",                         "Valparaíso",
+  "Metropolitana Santiago",            "Metropolitana de Santiago",
+  "O'Higgins",                          "O'Higgins",
+  "Maule",                              "Maule",
+  "Ñuble",                               "Ñuble",
+  "Biobío",                             "Biobío",
+  "Araucanía",                          "La Araucanía",
+  "Los Ríos",                            "Los Ríos",
+  "Los Lagos",                          "Los Lagos",
+  "Aysén del General Carlos Ibáñez",   "Aysén del General Carlos Ibáñez del Campo",
+  "Magallanes Antártica Chilena",      "Magallanes y de la Antártica Chilena"
+)
+
+# Crear dataset con conteo por región y cruzar con población
+df_densidad <- df_vigente |>
+  count(region_abrev, name = "n_establecimientos") |>
+  # Normalizar nombres para el join
+  mutate(
+    region_abrev_match = region_abrev |>
+      str_remove_all("de la |del? |De La ") |>
+      str_squish()
+  ) |>
+  left_join(equivalencias_regiones, by = "region_abrev_match") |>
+  left_join(poblacion_region, by = "region_censo") |>
+  mutate(
+    # Calcular establecimientos por cada 100,000 habitantes
+    estab_por_100k = (n_establecimientos / poblacion_2024) * 100000,
+    # Calcular habitantes por establecimiento
+    hab_por_estab = poblacion_2024 / n_establecimientos
+  ) |>
+  arrange(desc(estab_por_100k))
+
+# Visualización 1: Densidad de establecimientos por 100k habitantes
+df_densidad |>
+  mutate(region_abrev = fct_reorder(region_abrev, estab_por_100k)) |>
+  ggplot(aes(x = estab_por_100k, y = region_abrev, fill = estab_por_100k)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(
+    aes(label = sprintf("%.1f", estab_por_100k)),
+    hjust = -0.1, size = 3.2, colour = "grey30"
+  ) +
+  scale_fill_gradient(
+    low = "#f8c471", 
+    high = "#d35400",
+    name = "Establecimientos\npor 100k hab."
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.15)),
+    breaks = seq(0, 100, 20)
+  ) +
+  labs(
+    title    = "Densidad de Establecimientos de Salud por Región",
+    subtitle = "Establecimientos vigentes por cada 100.000 habitantes · Fuente: DEIS-MINSAL / Censo 2024",
+    x = "Establecimientos por 100.000 habitantes",
+    y = NULL,
+    caption = "Nota: Mayor densidad indica más acceso territorial relativo a la población"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title          = element_text(face = "bold", size = 13),
+    plot.subtitle       = element_text(colour = "grey50", size = 9),
+    plot.caption        = element_text(colour = "grey60", size = 8, hjust = 0),
+    panel.grid.major.y  = element_blank(),
+    panel.grid.minor.x  = element_blank()
+  )
+
+# Guardar gráfico
+ggsave(
+  "05_densidad_establecimientos_per_capita.png",
+  width = 10, height = 7, dpi = 150, bg = "white"
+)
+
+# Visualización 2: Habitantes por establecimiento (inversa)
+df_densidad |>
+  mutate(region_abrev = fct_reorder(region_abrev, hab_por_estab)) |>
+  ggplot(aes(x = hab_por_estab, y = region_abrev, fill = hab_por_estab)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(
+    aes(label = comma(round(hab_por_estab))),
+    hjust = -0.1, size = 3.2, colour = "grey30"
+  ) +
+  scale_fill_gradient(
+    low = "#85c1e9",
+    high = "#1a5490",
+    name = "Habitantes por\nestablecimiento"
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.15)),
+    labels = comma
+  ) +
+  labs(
+    title    = "Cobertura Poblacional por Establecimiento",
+    subtitle = "Habitantes promedio por establecimiento vigente · Fuente: DEIS-MINSAL / Censo 2024",
+    x = "Habitantes por establecimiento",
+    y = NULL,
+    caption = "Nota: Menor valor indica mejor acceso relativo (menos habitantes por punto de atención)"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title          = element_text(face = "bold", size = 13),
+    plot.subtitle       = element_text(colour = "grey50", size = 9),
+    plot.caption        = element_text(colour = "grey60", size = 8, hjust = 0),
+    panel.grid.major.y  = element_blank(),
+    panel.grid.minor.x  = element_blank()
+  )
+
+# Guardar gráfico
+ggsave(
+  "06_habitantes_por_establecimiento.png",
+  width = 10, height = 7, dpi = 150, bg = "white"
+)
+
+# Tabla resumen con densidad per cápita
+df_densidad |>
+  select(
+    Región = region_abrev,
+    Población = poblacion_2024,
+    Establecimientos = n_establecimientos,
+    `Estab./100k hab.` = estab_por_100k,
+    `Hab./Establecimiento` = hab_por_estab
+  ) |>
+  mutate(
+    Población = comma(Población),
+    `Estab./100k hab.` = sprintf("%.1f", `Estab./100k hab.`),
+    `Hab./Establecimiento` = comma(round(`Hab./Establecimiento`))
+  ) |>
+  arrange(desc(as.numeric(gsub(",", "", `Estab./100k hab.`)))) |>
+  kable(
+    caption = "Tabla 3. Densidad de establecimientos per cápita por región",
+    align = c("l", "r", "r", "r", "r")
+  ) |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    font_size = 12,
+    full_width = FALSE
+  )
+
+## -------------------------------------------------------------------
+## HALLAZGOS CLAVE DEL ANÁLISIS PER CÁPITA
+## -------------------------------------------------------------------
+
+# **Inequidad territorial evidenciada:**
+# - Regiones extremas (Aysén, Magallanes, Ñuble) tienen la MAYOR densidad
+#   de establecimientos per cápita (>70 por 100k habitantes)
+# - Región Metropolitana tiene la MENOR densidad (~22 por 100k habitantes)
+# - Esto refleja dos realidades:
+#   1. Dispersión geográfica en regiones con baja población requiere más
+#      puntos de atención (postas rurales) para cubrir territorio
+#   2. Concentración urbana en RM permite menos establecimientos pero de
+#      mayor complejidad (hospitales, clínicas)
+#
+# **Implicancia clínica:**
+# - Alta densidad NO equivale a mejor acceso efectivo:
+#   * Aysén: 78.3 estab./100k hab, pero distancias geográficas enormes
+#   * RM: 21.9 estab./100k hab, pero alta concentración de especialidades
+# - Se requiere análisis complementario de complejidad y resolutividad
+#   de los establecimientos para evaluar acceso real a salud
