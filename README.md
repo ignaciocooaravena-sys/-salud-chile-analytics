@@ -198,7 +198,7 @@ Para reproducir el análisis completo:
 
 ## 👤 Autor
 
-**Ignacio Aravena**
+**Ignacio Coo Aravena**
 
 Análisis desarrollado como parte del estudio de datos de salud pública chilena. Datos actualizados a **marzo de 2026**.
 
