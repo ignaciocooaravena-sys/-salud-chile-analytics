@@ -135,7 +135,7 @@ output: html_document
 
 > 🏨 **Tipos de Establecimiento:** Las **Postas de Salud Rural** y los **Centros de Salud Familiar (CESFAM)** constituyen los tipos más frecuentes, evidenciando la fortaleza de la estrategia de APS.
 
-> 🚨 **Cobertura de Urgencia:** La distribución de servicios de urgencia presenta asimetrías regionales importantes, con menor cobertura relativa en regiones extremas del país.
+> 🚨 **Cobertura de Urgencia:** La distribución de servicios de urgencia presenta asimetrías regionales importantes, con **mayor proporción de urgencia por establecimiento en regiones extremas** (Magallanes, Aysén, Arica y Parinacota), lo que refleja una red de atención más concentrada en establecimientos con capacidad resolutiva.
 
 ---
 
