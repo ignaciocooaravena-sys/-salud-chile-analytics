@@ -196,6 +196,231 @@ Para reproducir el análisis completo:
 
 ---
 
+---
+
+## 💻 Análisis en R
+
+A continuación se presentan los bloques de código R utilizados en el análisis, organizados por etapa del pipeline.
+
+### 1. Carga de Librerías y Datos
+
+```r
+library(tidyverse)   # manipulación y visualización de datos
+library(scales)      # formateo de ejes y etiquetas
+library(forcats)     # manejo de factores (fct_reorder, fct_lump)
+library(knitr)       # tablas en el documento
+library(kableExtra)  # estilo de tablas
+
+# Carga del dataset
+df_raw <- read_delim(
+  "establecimientos_20260303.csv",
+  delim = ";",
+  locale = locale(encoding = "UTF-8"),
+  show_col_types = FALSE
+)
+cat("Dimensiones del dataset:", nrow(df_raw), "filas ×", ncol(df_raw), "columnas")
+```
+
+### 2. Limpieza y Estandarización
+
+```r
+df <- df_raw |>
+  # Estandarizar TieneServicioUrgencia
+  mutate(
+    urgencia = case_when(
+      TieneServicioUrgencia == "SI"  ~ "Con Urgencia",
+      TieneServicioUrgencia == "NO"  ~ "Sin Urgencia",
+      TRUE                           ~ NA_character_   # SIN DATO / No Aplica / No
+    ),
+    # Estandarizar EstadoFuncionamiento (mayúsculas inconsistentes)
+    estado = str_to_title(EstadoFuncionamiento),
+    # Abreviar nombres de regiones largas para gráficos
+    region_abrev = RegionGlosa |>
+      str_remove("Región D?d?el? ?") |>
+      str_remove("Región ") |>
+      str_trunc(35)
+  )
+
+# Filtrar solo establecimientos vigentes
+df_vigente <- df |> filter(str_detect(estado, "Vigente"))
+cat("Establecimientos vigentes:", nrow(df_vigente), "de", nrow(df), "totales")
+```
+
+### 3. Distribución por Región
+
+```r
+df_vigente |>
+  count(region_abrev, name = "n") |>
+  mutate(region_abrev = fct_reorder(region_abrev, n)) |>
+  ggplot(aes(x = n, y = region_abrev, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(
+    aes(label = comma(n)),
+    hjust = -0.1, size = 3.2, colour = "grey30"
+  ) +
+  scale_fill_gradient(low = "#a8d8ea", high = "#1a5276") +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.12)),
+    labels = comma
+  ) +
+  labs(
+    title    = "Establecimientos de Salud Vigentes por Región",
+    subtitle = "Fuente: DEIS – MINSAL · Marzo 2026",
+    x = "N° de establecimientos", y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title          = element_text(face = "bold", size = 13),
+    plot.subtitle       = element_text(colour = "grey50"),
+    panel.grid.major.y  = element_blank()
+  )
+```
+
+### 4. Dependencia Administrativa por Región
+
+```r
+df_dep <- df_vigente |>
+  mutate(
+    dependencia = fct_other(
+      DependenciaAdministrativa,
+      keep = c("Municipal", "Privado", "Servicio de Salud",
+               "Fuerzas Armadas y de Orden (FFAA)"),
+      other_level = "Otras"
+    )
+  ) |>
+  count(region_abrev, dependencia) |>
+  group_by(region_abrev) |>
+  mutate(pct = n / sum(n)) |>
+  ungroup() |>
+  mutate(region_abrev = fct_reorder(region_abrev, n, sum))
+
+paleta_dep <- c(
+  "Municipal"                       = "#2471a3",
+  "Privado"                         = "#e74c3c",
+  "Servicio de Salud"               = "#27ae60",
+  "Fuerzas Armadas y de Orden (FFAA)" = "#8e44ad",
+  "Otras"                           = "#95a5a6"
+)
+
+df_dep |>
+  ggplot(aes(x = n, y = region_abrev, fill = dependencia)) +
+  geom_col(position = "stack") +
+  scale_fill_manual(values = paleta_dep, name = "Dependencia") +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title    = "Dependencia Administrativa por Región (establecimientos vigentes)",
+    subtitle = "Fuente: DEIS – MINSAL · Marzo 2026",
+    x = "N° de establecimientos", y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    panel.grid.major.y = element_blank(),
+    legend.position    = "bottom"
+  )
+```
+
+### 5. Top 15 Tipos de Establecimiento
+
+```r
+df_vigente |>
+  count(TipoEstablecimientoGlosa, name = "n") |>
+  slice_max(n, n = 15) |>
+  mutate(TipoEstablecimientoGlosa = fct_reorder(TipoEstablecimientoGlosa, n)) |>
+  ggplot(aes(x = n, y = TipoEstablecimientoGlosa, fill = n)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(
+    aes(label = comma(n)),
+    hjust = -0.1, size = 3.2, colour = "grey30"
+  ) +
+  scale_fill_gradient(low = "#a9dfbf", high = "#1e8449") +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.12)),
+    labels = comma
+  ) +
+  labs(
+    title    = "Top 15 Tipos de Establecimiento de Salud Vigentes",
+    subtitle = "Fuente: DEIS – MINSAL · Marzo 2026",
+    x = "N° de establecimientos", y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    panel.grid.major.y = element_blank()
+  )
+```
+
+### 6. Cobertura de Urgencia por Región
+
+```r
+df_urg <- df_vigente |>
+  filter(!is.na(urgencia)) |>
+  count(region_abrev, urgencia) |>
+  group_by(region_abrev) |>
+  mutate(total = sum(n), pct = n / total) |>
+  ungroup() |>
+  mutate(
+    region_abrev = fct_reorder(
+      region_abrev,
+      if_else(urgencia == "Con Urgencia", pct, 0),
+      max
+    )
+  )
+
+df_urg |>
+  ggplot(aes(x = pct, y = region_abrev, fill = urgencia)) +
+  geom_col(position = "fill") +
+  geom_text(
+    data = df_urg |> filter(urgencia == "Con Urgencia"),
+    aes(label = percent(pct, accuracy = 0.1), x = 0.02),
+    hjust = 0, size = 3, colour = "white", fontface = "bold"
+  ) +
+  scale_x_continuous(labels = percent, expand = c(0, 0)) +
+  scale_fill_manual(
+    values = c("Con Urgencia" = "#c0392b", "Sin Urgencia" = "#aab7b8"),
+    name = NULL
+  ) +
+  labs(
+    title    = "Proporción de Establecimientos con Servicio de Urgencia por Región",
+    subtitle = "Fuente: DEIS – MINSAL · Marzo 2026",
+    x = "Proporción de establecimientos", y = NULL
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    panel.grid.major.y = element_blank(),
+    legend.position    = "bottom"
+  )
+```
+
+### 7. Tabla Resumen por Región
+
+```r
+df_vigente |>
+  group_by(region_abrev) |>
+  summarise(
+    Total        = n(),
+    Hospitales   = sum(TipoEstablecimientoGlosa == "Hospital"),
+    CESFAM       = sum(TipoEstablecimientoGlosa == "Centro de Salud Familiar (CESFAM)"),
+    PSR          = sum(TipoEstablecimientoGlosa == "Posta de Salud Rural (PSR)"),
+    `Con Urgencia` = sum(urgencia == "Con Urgencia", na.rm = TRUE),
+    `% Urgencia` = percent(
+      mean(urgencia == "Con Urgencia", na.rm = TRUE),
+      accuracy = 0.1
+    )
+  ) |>
+  arrange(desc(Total)) |>
+  rename(Región = region_abrev) |>
+  kable(caption = "Tabla 2. Resumen por región – establecimientos vigentes") |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    font_size = 12
+  )
+```
+
 ## 👤 Autor
 
 **Ignacio Coo Aravena**
