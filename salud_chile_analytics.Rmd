@@ -1,321 +1,627 @@
 ---
-title: "Disparidades Territoriales en Salud: Chile 2024-2026"
-subtitle: "Análisis cruzado de establecimientos DEIS, densidad poblacional INE"
-author: "Ignacio Aravena"
+title: "🏥 Disparidades Territoriales en Salud: Chile 2026"
+subtitle: "Análisis integrado de cobertura, carga asistencial y acceso territorial — DEIS MINSAL + INE + BCN-SIIT"
+author: "Ignacio Coo Aravena"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
   html_document:
     theme: flatly
     highlight: tango
     toc: true
-    toc_float: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
     toc_depth: 3
     code_folding: show
     df_print: paged
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 11, fig.height = 6.5, dpi = 150)
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  warning    = FALSE,
+  message    = FALSE,
+  fig.width  = 10,
+  fig.height = 6,
+  dpi        = 150,
+  fig.align  = "center"
+)
 ```
 
-# 1. Introducción
+---
 
-El número bruto de establecimientos de salud por región puede ser engañoso: una región con muchos establecimientos pero también con mucha población puede estar más desatendida que una región pequeña con pocos establecimientos. 
+# 📌 Descripción
 
-Este análisis cruza los datos del **Registro Nacional de Prestadores (DEIS MINSAL, marzo 2026)** con las **proyecciones de población INE 2024** y la superficie regional para calcular indicadores ajustados que revelan las verdaderas disparidades territoriales del sistema de salud chileno.
+El conteo bruto de establecimientos de salud por región puede ser **profundamente engañoso**: una región con muchos establecimientos pero también con alta población puede estar más desatendida que una región pequeña con pocos. Del mismo modo, una alta dotación per cápita no garantiza acceso físico en territorios extensos y despoblados.
 
-**Indicadores construidos:**
-* **Establecimientos por 100.000 habitantes:** acceso poblacional.
-* **Habitantes por establecimiento:** carga asistencial.
-* **Establecimientos por 1.000 km²:** densidad territorial.
-* **Urgencias por 100.000 habitantes.**
+Este análisis cruza el **Registro Nacional de Prestadores (DEIS MINSAL, marzo 2026)** con las **proyecciones de población INE 2024** (base Censo 2017) y la superficie regional (BCN-SIIT) para construir indicadores ajustados que revelan las verdaderas disparidades territoriales del sistema de salud chileno.
 
-> **Fuentes:** DEIS-MINSAL (establecimientos), INE (proyecciones población 2024, base Censo 2017), BCN-SIIT (superficie regional).
+## ❓ Preguntas de Investigación
 
-# 2. Paquetes y Datos
+- ¿Qué regiones tienen mayor y menor cobertura de establecimientos **ajustada por población**?
+- ¿Dónde es mayor la **carga asistencial** (habitantes por establecimiento)?
+- ¿Qué regiones presentan mayor **densidad territorial** de la red asistencial?
+- ¿Cómo se distribuye la **cobertura de urgencias** per cápita?
+- ¿Existe correlación entre densidad poblacional y cobertura relativa de salud?
+
+## 📊 Indicadores Construidos
+
+| Indicador | Fórmula | Dimensión |
+|---|---|---|
+| Estab. / 100.000 hab. | `(n / pob) × 100.000` | Cobertura poblacional |
+| Hab. / establecimiento | `pob / n` | Carga asistencial |
+| Estab. / 1.000 km² | `(n / sup) × 1.000` | Densidad territorial |
+| Urgencias / 100.000 hab. | `(n_urg / pob) × 100.000` | Acceso a urgencias |
+
+## 📋 Fuente de Datos
+
+| Campo | Detalle |
+|---|---|
+| **Establecimientos** | Departamento de Estadísticas e Información de Salud (DEIS) – MINSAL |
+| **Archivo** | `establecimientos20260303.csv` |
+| **Población** | Proyecciones INE 2024, base Censo 2017 |
+| **Superficie** | BCN-SIIT (superficie regional en km²) |
+| **Actualización** | Marzo 2026 |
+| **URL** | https://deis.minsal.cl/ |
+
+---
+
+# ⚙️ Paquetes y Preparación de Datos
+
+## Carga de Librerías
 
 ```{r librerias}
-library(tidyverse)
-library(scales)
-library(forcats)
-library(knitr)
-library(kableExtra)
-library(ggrepel) # etiquetas sin solapamiento en scatter plots
+library(tidyverse)   # manipulación y visualización de datos
+library(scales)      # formateo de ejes y etiquetas
+library(forcats)     # manejo de factores (fct_reorder, fct_lump)
+library(knitr)       # tablas en el documento
+library(kableExtra)  # estilo profesional de tablas HTML
+library(ggrepel)     # etiquetas sin solapamiento en scatter plots
+library(patchwork)   # composición de múltiples gráficos
 ```
 
-## 2.1 Establecimientos DEIS
+## Carga y Limpieza de Establecimientos DEIS
 
 ```{r carga_establecimientos}
-# Carga de datos crudos (asumiendo que el archivo está en el directorio de trabajo)
-df_raw <- read.delim("establecimientos20260303.csv", delim = ",", locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+df_raw <- read.delim(
+  "establecimientos20260303.csv",
+  delim          = ",",
+  locale         = locale(encoding = "UTF-8"),
+  show_col_types = FALSE
+)
 
-df <- df_raw %>% 
+df <- df_raw |>
   mutate(
     urgencia = case_when(
-      TieneServicioUrgencia == "SI" ~ "Con Urgencia",
-      TieneServicioUrgencia == "NO" ~ "Sin Urgencia",
-      TRUE ~ NA_character_
+      TieneServicioUrgencia == "SI"  ~ "Con Urgencia",
+      TieneServicioUrgencia == "NO"  ~ "Sin Urgencia",
+      TRUE                           ~ NA_character_
     ),
     estado = str_to_title(EstadoFuncionamiento)
   )
 
-df_vigente <- df %>% filter(str_detect(estado, "Vigente"))
+df_vigente <- df |> filter(str_detect(estado, "Vigente"))
 
-cat("Establecimientos vigentes:", nrow(df_vigente))
+cat("Dimensiones del dataset:", nrow(df_raw), "filas x", ncol(df_raw), "columnas\n")
+cat("Establecimientos vigentes:", nrow(df_vigente), "de", nrow(df), "totales")
 ```
 
-## 2.2 Datos Demográficos y Territoriales (INE 2024 / BCN-SIIT)
+## Datos Demográficos y Territoriales (INE 2024 / BCN-SIIT)
 
 ```{r datos_demograficos}
 # Fuente: Proyecciones INE 2024 (base Censo 2017) y BCN-SIIT (superficie regional)
 poblacion_region <- tibble(
   region_csv = c(
-    "Región de Arica y Parinacota", "Región de Tarapacá", "Región de Antofagasta", "Región de Atacama",
-    "Región de Coquimbo", "Región de Valparaíso", "Región Metropolitana de Santiago",
-    "Región del Libertador Gral. B. O'Higgins", "Región del Maule", "Región de Ñuble",
-    "Región del Biobío", "Región de La Araucanía", "Región de Los Ríos", "Región de Los Lagos",
-    "Región de Aysén del General Carlos Ibañez del Campo", "Región de Magallanes y de la Antártica Chilena"
+    "Region de Arica y Parinacota", "Region de Tarapaca",
+    "Region de Antofagasta", "Region de Atacama",
+    "Region de Coquimbo", "Region de Valparaiso",
+    "Region Metropolitana de Santiago",
+    "Region del Libertador Gral. B. O'Higgins", "Region del Maule",
+    "Region de Nuble", "Region del Biobio", "Region de La Araucania",
+    "Region de Los Rios", "Region de Los Lagos",
+    "Region de Aysen del General Carlos Ibanez del Campo",
+    "Region de Magallanes y de la Antartica Chilena"
   ),
   region_label = c(
-    "Arica y Parinacota", "Tarapacá", "Antofagasta", "Atacama", "Coquimbo", "Valparaíso", "Metropolitana",
-    "O'Higgins", "Maule", "Ñuble", "Biobío", "La Araucanía", "Los Ríos", "Los Lagos", "Aysén", "Magallanes"
+    "Arica y Parinacota", "Tarapaca", "Antofagasta", "Atacama",
+    "Coquimbo", "Valparaiso", "Metropolitana", "O'Higgins",
+    "Maule", "Nuble", "Biobio", "La Araucania",
+    "Los Rios", "Los Lagos", "Aysen", "Magallanes"
+  ),
+  zona = c(
+    "Norte", "Norte", "Norte", "Norte",
+    "Centro", "Centro", "Centro", "Centro",
+    "Sur", "Sur", "Sur", "Sur", "Sur", "Sur",
+    "Austral", "Austral"
   ),
   poblacion_2024 = c(
-    261779, 406287, 718232, 319992, 879267, 2025693, 8420729, 1025586, 1171982, 521711,
-    1686225, 1032164, 412786, 912171, 108538, 183235
+    261779, 406287, 718232, 319992, 879267, 2025693, 8420729,
+    1025586, 1171982, 521711, 1686225, 1032164, 412786, 912171,
+    108538, 183235
   ),
   superficie_km2 = c(
-    16873, 42226, 126049, 75176, 40580, 16396, 15403, 16387, 30296, 13178, 23865, 31842, 18430, 48584, 108494, 132291
+    16873, 42226, 126049, 75176, 40580, 16396, 15403, 16387,
+    30296, 13178, 23865, 31842, 18430, 48584, 108494, 132291
   )
 )
 ```
 
-## 2.3 Construcción del Dataset Integrado
+## Construcción del Dataset Integrado
 
 ```{r integracion}
-# Consolidar variantes de nombre de región en el CSV
-df_vigente_clean <- df_vigente %>% 
+# Consolidar variantes de nombre de region en el CSV
+df_vigente_clean <- df_vigente |>
   mutate(region_csv = case_when(
-    str_detect(RegionGlosa, "Aysén|Aysen") ~ "Región de Aysén del General Carlos Ibañez del Campo",
-    str_detect(RegionGlosa, "Coquimbo") ~ "Región de Coquimbo",
-    str_detect(RegionGlosa, "Los Ríos|Los Rios") ~ "Región de Los Ríos",
-    str_detect(RegionGlosa, "Biobío|Biobio|Bio Bio") ~ "Región del Biobío",
-    TRUE ~ RegionGlosa
+    str_detect(RegionGlosa, "Aysen|Aysen")          ~ "Region de Aysen del General Carlos Ibanez del Campo",
+    str_detect(RegionGlosa, "Coquimbo")              ~ "Region de Coquimbo",
+    str_detect(RegionGlosa, "Los Rios|Los Rios")     ~ "Region de Los Rios",
+    str_detect(RegionGlosa, "Biobio|Biobio|Bio Bio") ~ "Region del Biobio",
+    TRUE                                             ~ RegionGlosa
   ))
 
-# Contar por región
-establecimientos_region <- df_vigente_clean %>% 
-  group_by(region_csv) %>% 
+# Contar por region
+establecimientos_region <- df_vigente_clean |>
+  group_by(region_csv) |>
   summarise(
-    n_total = n(),
+    n_total      = n(),
     n_hospitales = sum(TipoEstablecimientoGlosa == "Hospital"),
-    n_cesfam = sum(TipoEstablecimientoGlosa == "Centro de Salud Familiar (CESFAM)"),
-    n_psr = sum(TipoEstablecimientoGlosa == "Posta de Salud Rural (PSR)"),
-    n_urgencia = sum(urgencia == "Con Urgencia", na.rm = TRUE),
-    .groups = "drop"
+    n_cesfam     = sum(TipoEstablecimientoGlosa == "Centro de Salud Familiar (CESFAM)"),
+    n_psr        = sum(TipoEstablecimientoGlosa == "Posta de Salud Rural (PSR)"),
+    n_urgencia   = sum(urgencia == "Con Urgencia", na.rm = TRUE),
+    .groups      = "drop"
   )
 
-# Join con datos demográficos
-df_integrado <- establecimientos_region %>% 
-  left_join(poblacion_region, by = "region_csv") %>% 
+# Join con datos demograficos y calculo de indicadores
+df_integrado <- establecimientos_region |>
+  left_join(poblacion_region, by = "region_csv") |>
   mutate(
-    estab_x100k = (n_total / poblacion_2024) * 100000,
-    hab_x_estab = poblacion_2024 / n_total,
-    estab_x_1000km2 = (n_total / superficie_km2) * 1000,
-    urgencia_x100k = (n_urgencia / poblacion_2024) * 100000,
-    densidad_pob = poblacion_2024 / superficie_km2
+    estab_x100k     = (n_total    / poblacion_2024) * 100000,
+    hab_x_estab     =  poblacion_2024 / n_total,
+    estab_x_1000km2 = (n_total    / superficie_km2) * 1000,
+    urgencia_x100k  = (n_urgencia / poblacion_2024) * 100000,
+    densidad_pob    =  poblacion_2024 / superficie_km2
   )
 
-glimpse(df_integrado)
+cat("Dimensiones del dataset integrado:", nrow(df_integrado), "filas x", ncol(df_integrado), "columnas")
 ```
 
-# 3. Análisis de Disparidades
+---
 
-## 3.1 Establecimientos por 100.000 Habitantes
+# 🔎 Analisis de Disparidades
+
+## 📍 Cobertura Poblacional: Establecimientos por 100.000 Habitantes
 
 ```{r plot_estab_x100k, fig.height=7}
-df_integrado %>% 
+prom_nacional <- mean(df_integrado$estab_x100k)
+
+df_integrado |>
   mutate(
     region_label = fct_reorder(region_label, estab_x100k),
     grupo = case_when(
       estab_x100k > quantile(estab_x100k, 0.75) ~ "Alta cobertura",
       estab_x100k < quantile(estab_x100k, 0.25) ~ "Baja cobertura",
-      TRUE ~ "Cobertura media"
+      TRUE                                       ~ "Cobertura media"
     )
-  ) %>% 
+  ) |>
   ggplot(aes(x = estab_x100k, y = region_label, fill = grupo)) +
-  geom_col(show.legend = TRUE) +
-  geom_vline(xintercept = mean(df_integrado$estab_x100k), linetype = "dashed", colour = "grey40", linewidth = 0.7) +
-  geom_text(aes(label = round(estab_x100k, 1)), hjust = -0.15, size = 3, colour = "grey20") +
-  scale_fill_manual(values = c("Alta cobertura" = "#1a7431", "Cobertura media" = "#2471a3", "Baja cobertura" = "#c0392b"), name = NULL) +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
-  annotate("text", x = mean(df_integrado$estab_x100k) + 1, y = 1, label = paste0("Promedio país: ", round(mean(df_integrado$estab_x100k), 1)), hjust = 0, size = 3, colour = "grey40") +
+  geom_col(width = 0.7, show.legend = TRUE) +
+  geom_vline(
+    xintercept = prom_nacional,
+    linetype = "dashed", colour = "grey35", linewidth = 0.7
+  ) +
+  geom_text(
+    aes(label = round(estab_x100k, 1)),
+    hjust = -0.2, size = 3.2, colour = "grey20"
+  ) +
+  annotate(
+    "label",
+    x = prom_nacional + 0.5, y = 2,
+    label = paste0("Promedio pais\n", round(prom_nacional, 1), " estab/100k"),
+    hjust = 0, size = 2.8, colour = "grey35",
+    fill = "white", label.size = 0.3
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Alta cobertura"  = "#1e8449",
+      "Cobertura media" = "#2471a3",
+      "Baja cobertura"  = "#c0392b"
+    ),
+    name = NULL
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
   labs(
-    title = "Establecimientos de Salud Vigentes por 100.000 Habitantes",
-    subtitle = "Cruza establecimientos DEIS marzo 2026 + proyección poblacional INE 2024",
-    x = "Establecimientos por 100.000 hab.", y = NULL,
-    caption = "Fuentes: DEIS MINSAL + INE Chile"
+    title    = "Establecimientos de Salud Vigentes por 100.000 Habitantes",
+    subtitle = "Fuente: DEIS - MINSAL . Marzo 2026 + proyeccion poblacional INE 2024",
+    x        = "Establecimientos por 100.000 hab.",
+    y        = NULL,
+    caption  = "Fuentes: DEIS MINSAL . INE Chile . BCN-SIIT"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 13),
-    plot.subtitle = element_text(colour = "grey50"),
-    plot.caption = element_text(colour = "grey60"),
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    plot.caption       = element_text(colour = "grey60", size = 8),
     panel.grid.major.y = element_blank(),
-    legend.position = "bottom"
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom"
   )
 ```
 
-> **Hallazgo:** Las regiones extremas y despobladas (Aysén, Magallanes, Arica y Parinacota) tienen una cobertura relativa muy superior al promedio nacional, mientras que regiones densamente pobladas como la Metropolitana, O'Higgins y Valparaíso quedan bajo la media, lo que invierte completamente el ranking de conteo bruto visto anteriormente.
+> 📍 **Hallazgo:** Las regiones extremas y despobladas (Aysen, Magallanes, Arica y Parinacota) presentan una cobertura relativa muy por encima del promedio nacional. Las regiones densamente pobladas (Metropolitana, O'Higgins, Valparaiso) quedan bajo la media, **invirtiendo completamente el ranking del conteo bruto**.
 
-## 3.2 Carga Asistencial: Habitantes por Establecimiento
+---
+
+## 🏋 Carga Asistencial: Habitantes por Establecimiento
 
 ```{r plot_hab_x_estab, fig.height=7}
-df_integrado %>% 
-  mutate(region_label = fct_reorder(region_label, -hab_x_estab)) %>% 
-  ggplot(aes(x = hab_x_estab, y = region_label, fill = hab_x_estab)) +
-  geom_col(show.legend = FALSE) +
-  geom_text(aes(label = comma(round(hab_x_estab))), hjust = -0.1, size = 3, colour = "grey20") +
-  scale_fill_gradient(low = "#f9e79f", high = "#c0392b") +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.15)), labels = comma) +
+media_hab <- mean(df_integrado$hab_x_estab)
+
+df_integrado |>
+  mutate(
+    region_label = fct_reorder(region_label, hab_x_estab),
+    sobre_media  = hab_x_estab > media_hab
+  ) |>
+  ggplot(aes(x = hab_x_estab, y = region_label)) +
+  geom_segment(
+    aes(x = 0, xend = hab_x_estab,
+        y = region_label, yend = region_label,
+        colour = sobre_media),
+    linewidth = 1.3
+  ) +
+  geom_point(aes(colour = sobre_media), size = 4) +
+  geom_text(
+    aes(label = comma(round(hab_x_estab))),
+    hjust = -0.25, size = 3.1, colour = "grey20"
+  ) +
+  geom_vline(
+    xintercept = media_hab,
+    linetype = "dashed", colour = "grey35", linewidth = 0.7
+  ) +
+  annotate(
+    "label",
+    x = media_hab + 100, y = 2,
+    label = paste0("Media pais\n", comma(round(media_hab)), " hab/estab"),
+    hjust = 0, size = 2.8, colour = "grey35",
+    fill = "white", label.size = 0.3
+  ) +
+  scale_colour_manual(
+    values = c("TRUE" = "#c0392b", "FALSE" = "#2471a3"),
+    labels = c("TRUE" = "Sobre la media", "FALSE" = "Bajo la media"),
+    name   = NULL
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.2)),
+    labels = comma
+  ) +
   labs(
-    title = "Carga Asistencial: Habitantes por Establecimiento de Salud",
-    subtitle = "A mayor valor, mayor presión sobre cada establecimiento",
-    x = "Habitantes por establecimiento", y = NULL,
-    caption = "Fuentes: DEIS MINSAL + INE Chile"
+    title    = "Carga Asistencial: Habitantes por Establecimiento de Salud",
+    subtitle = "Fuente: DEIS - MINSAL . Marzo 2026 | A mayor valor, mayor presion sobre cada centro",
+    x        = "Habitantes por establecimiento",
+    y        = NULL,
+    caption  = "Fuentes: DEIS MINSAL . INE Chile"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 13),
-    plot.subtitle = element_text(colour = "grey50"),
-    plot.caption = element_text(colour = "grey60"),
-    panel.grid.major.y = element_blank()
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    plot.caption       = element_text(colour = "grey60", size = 8),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom"
   )
 ```
 
-> **Hallazgo:** La Región Metropolitana presenta la mayor carga asistencial del país, con aproximadamente 8.000 habitantes por establecimiento (más de 4 veces la media nacional). O'Higgins y Valparaíso también muestran alta presión asistencial. Esto sugiere que en las regiones más pobladas, cada establecimiento debe absorber una demanda significativamente mayor.
+> 🏋 **Hallazgo:** La Region Metropolitana registra ~8.000 habitantes por establecimiento, mas de cuatro veces la media nacional. O'Higgins y Valparaiso tambien superan ese umbral. Cada establecimiento absorbe una demanda significativamente mayor en estas regiones, generando mayor presion sobre listas de espera y capacidad de respuesta.
 
-## 3.3 Densidad Territorial de Establecimientos
+---
+
+## 🗺 Densidad Territorial de Establecimientos
 
 ```{r plot_densidad_territorial, fig.height=7}
-df_integrado %>% 
-  mutate(region_label = fct_reorder(region_label, estab_x_1000km2)) %>% 
-  ggplot(aes(x = estab_x_1000km2, y = region_label, fill = estab_x_1000km2)) +
-  geom_col(show.legend = FALSE) +
-  geom_text(aes(label = round(estab_x_1000km2, 1)), hjust = -0.1, size = 3, colour = "grey20") +
-  scale_fill_gradient(low = "#d6eaf8", high = "#1a5276") +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+df_integrado |>
+  mutate(region_label = fct_reorder(region_label, estab_x_1000km2)) |>
+  ggplot(aes(x = estab_x_1000km2, y = region_label, fill = zona)) +
+  geom_col(width = 0.7) +
+  geom_text(
+    aes(label = round(estab_x_1000km2, 1)),
+    hjust = -0.15, size = 3.2, colour = "grey20"
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Norte"   = "#e59866",
+      "Centro"  = "#2e86c1",
+      "Sur"     = "#1e8449",
+      "Austral" = "#8e44ad"
+    ),
+    name = "Zona"
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
   labs(
-    title = "Densidad Territorial de Establecimientos de Salud",
-    subtitle = "Establecimientos por 1.000 km² de superficie regional",
-    x = "Establecimientos por 1.000 km²", y = NULL,
-    caption = "Fuentes: DEIS MINSAL + BCN-SIIT (superficie)"
+    title    = "Densidad Territorial de Establecimientos de Salud",
+    subtitle = "Fuente: DEIS - MINSAL . Marzo 2026 | Establecimientos por 1.000 km2",
+    x        = "Establecimientos por 1.000 km2",
+    y        = NULL,
+    caption  = "Fuentes: DEIS MINSAL . BCN-SIIT (superficie regional)"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 13),
-    plot.subtitle = element_text(colour = "grey50"),
-    plot.caption = element_text(colour = "grey60"),
-    panel.grid.major.y = element_blank()
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    plot.caption       = element_text(colour = "grey60", size = 8),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "right"
   )
 ```
 
-> **Hallazgo:** Desde la perspectiva territorial, la dispersión es extrema. La Región Metropolitana tiene una densidad de establecimientos ~1.000x mayor que Aysén o Magallanes, lo que refleja los enormes desafíos logísticos de acceso en los territorios australes y patagónicos, donde las distancias entre puntos de atención pueden superar cientos de kilómetros.
+> 🗺 **Hallazgo:** La dispersion territorial es extrema. La Region Metropolitana concentra una densidad ~1.000x mayor que Aysen o Magallanes. En los territorios australes, las distancias entre puntos de atencion pueden superar cientos de kilometros: **per capita y acceso fisico son dimensiones complementarias, no equivalentes**.
 
-## 3.4 Scatter: Desigualdad entre Carga Poblacional y Cobertura Territorial
+---
 
-```{r scatter_disparidad, fig.width=10, fig.height=7}
-df_integrado %>% 
-  ggplot(aes(x = densidad_pob, y = estab_x100k, size = poblacion_2024, colour = urgencia_x100k, label = region_label)) +
-  geom_point(alpha = 0.8) +
-  geom_text_repel(size = 3.2, colour = "grey25", box.padding = 0.4, point.padding = 0.3, max.overlaps = 20) +
-  scale_x_log10(labels = comma) +
-  scale_colour_gradient(low = "#aab7b8", high = "#c0392b", name = "Urgencias/100k hab.") +
-  scale_size_continuous(range = c(3, 14), labels = comma, name = "Población") +
+## 🏨 Composicion de la Red Asistencial por Region
+
+```{r plot_composicion_tipo, fig.height=7}
+df_integrado |>
+  select(region_label, n_hospitales, n_cesfam, n_psr) |>
+  pivot_longer(
+    cols      = c(n_hospitales, n_cesfam, n_psr),
+    names_to  = "tipo",
+    values_to = "n"
+  ) |>
+  mutate(
+    tipo = recode(tipo,
+      n_hospitales = "Hospitales",
+      n_cesfam     = "CESFAM",
+      n_psr        = "Postas de Salud Rural"
+    ),
+    region_label = fct_reorder(region_label, n, .fun = sum)
+  ) |>
+  ggplot(aes(x = n, y = region_label, fill = tipo)) +
+  geom_col(position = "stack", width = 0.7) +
+  scale_fill_manual(
+    values = c(
+      "Hospitales"            = "#1a5276",
+      "CESFAM"                = "#2e86c1",
+      "Postas de Salud Rural" = "#85c1e9"
+    ),
+    name = NULL
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0, 0.08)),
+    labels = comma
+  ) +
   labs(
-    title = "Relación entre Densidad Poblacional y Cobertura de Salud por Región",
-    subtitle = "Eje X (log): densidad hab/km² | Eje Y: establecimientos por 100k hab. 
-Tamaño del punto: población total | Color: urgencias por 100k",
-    x = "Densidad de población (hab/km², escala log)",
-    y = "Establecimientos por 100.000 hab.",
-    caption = "Fuentes: DEIS MINSAL + INE Chile + BCN-SIIT"
+    title    = "Composicion de la Red Asistencial por Region",
+    subtitle = "Fuente: DEIS - MINSAL . Marzo 2026 | Hospitales, CESFAM y Postas de Salud Rural",
+    x        = "N de establecimientos",
+    y        = NULL,
+    caption  = "Fuente: DEIS MINSAL (marzo 2026)"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 13),
-    plot.subtitle = element_text(colour = "grey50"),
-    plot.caption = element_text(colour = "grey60")
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    plot.caption       = element_text(colour = "grey60", size = 8),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom"
   )
 ```
 
-> **Hallazgo clave:** Existe una correlación negativa clara entre densidad poblacional y cobertura relativa: a mayor densidad de habitantes, menor dotación de establecimientos por persona. Esto sugiere que el sistema de salud chileno tiene mayor presión asistencial precisamente donde vive más gente. Las regiones con mayor cobertura relativa (esquina superior izquierda) son las más despobladas y extensas, donde la red de Postas de Salud Rural actúa como columna vertebral del sistema.
+> 🏨 **Hallazgo:** Las regiones del sur y austral muestran alta proporcion de **Postas de Salud Rural (PSR)**, columna vertebral de la APS en zonas dispersas. Las regiones del centro concentran mayor proporcion de CESFAM, que operan en contextos urbanos con demanda concentrada.
 
-## 3.5 Cobertura de Urgencia Ajustada por Población
+---
+
+## 📈 Relacion entre Densidad Poblacional y Cobertura de Salud
+
+```{r scatter_disparidad, fig.width=11, fig.height=7}
+df_integrado |>
+  ggplot(aes(
+    x      = densidad_pob,
+    y      = estab_x100k,
+    size   = poblacion_2024,
+    colour = urgencia_x100k,
+    label  = region_label
+  )) +
+  geom_smooth(
+    method = "lm", se = TRUE,
+    colour = "grey60", fill = "grey90",
+    linewidth = 0.8, show.legend = FALSE
+  ) +
+  geom_point(alpha = 0.85) +
+  geom_text_repel(
+    size = 3.2, colour = "grey20",
+    box.padding = 0.5, point.padding = 0.3,
+    max.overlaps = 20
+  ) +
+  annotate("text", x = 4,    y = 1.5,
+    label = "Baja densidad\nAlta cobertura",
+    colour = "#1e8449", size = 2.8, fontface = "italic") +
+  annotate("text", x = 2500, y = 1.5,
+    label = "Alta densidad\nBaja cobertura",
+    colour = "#c0392b", size = 2.8, fontface = "italic") +
+  scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 500)) +
+  scale_colour_gradient(
+    low  = "#aab7b8",
+    high = "#c0392b",
+    name = "Urgencias/100k hab."
+  ) +
+  scale_size_continuous(
+    range  = c(3, 15),
+    labels = comma,
+    name   = "Poblacion 2024"
+  ) +
+  labs(
+    title    = "Relacion entre Densidad Poblacional y Cobertura de Salud por Region",
+    subtitle = "Fuente: DEIS - MINSAL . INE . BCN-SIIT | Eje X en escala logaritmica",
+    x        = "Densidad poblacional (hab/km2, escala logaritmica)",
+    y        = "Establecimientos por 100.000 hab.",
+    caption  = "Fuentes: DEIS MINSAL . INE Chile . BCN-SIIT"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title      = element_text(face = "bold", size = 13),
+    plot.subtitle   = element_text(colour = "grey50"),
+    plot.caption    = element_text(colour = "grey60", size = 8),
+    legend.position = "right"
+  )
+```
+
+> 📈 **Hallazgo clave:** Existe una **correlacion negativa significativa** entre densidad poblacional y cobertura relativa. El sistema enfrenta su mayor presion asistencial precisamente donde vive mas gente. Las regiones de baja densidad sostienen su cobertura principalmente a traves de la red de PSR.
+
+---
+
+## 🚨 Cobertura de Urgencias Ajustada por Poblacion
 
 ```{r plot_urgencia_ajustada, fig.height=7}
-df_integrado %>% 
-  mutate(region_label = fct_reorder(region_label, urgencia_x100k)) %>% 
-  ggplot(aes(x = urgencia_x100k, y = region_label, fill = urgencia_x100k)) +
-  geom_col(show.legend = FALSE) +
-  geom_text(aes(label = round(urgencia_x100k, 1)), hjust = -0.1, size = 3, colour = "grey20") +
-  scale_fill_gradient(low = "#fadbd8", high = "#922b21") +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+media_urg <- mean(df_integrado$urgencia_x100k)
+
+df_integrado |>
+  mutate(
+    region_label = fct_reorder(region_label, urgencia_x100k),
+    sobre_media  = urgencia_x100k > media_urg
+  ) |>
+  ggplot(aes(x = urgencia_x100k, y = region_label)) +
+  geom_segment(
+    aes(x = 0, xend = urgencia_x100k,
+        y = region_label, yend = region_label,
+        colour = sobre_media),
+    linewidth = 1.3
+  ) +
+  geom_point(aes(colour = sobre_media), size = 4) +
+  geom_text(
+    aes(label = round(urgencia_x100k, 1)),
+    hjust = -0.3, size = 3.1, colour = "grey20"
+  ) +
+  geom_vline(
+    xintercept = media_urg,
+    linetype = "dashed", colour = "grey35", linewidth = 0.7
+  ) +
+  annotate(
+    "label",
+    x = media_urg + 0.2, y = 2,
+    label = paste0("Media pais\n", round(media_urg, 1), " urg/100k"),
+    hjust = 0, size = 2.8, colour = "grey35",
+    fill = "white", label.size = 0.3
+  ) +
+  scale_colour_manual(
+    values = c("TRUE" = "#c0392b", "FALSE" = "#aab7b8"),
+    labels = c("TRUE" = "Sobre la media", "FALSE" = "Bajo la media"),
+    name   = NULL
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
   labs(
-    title = "Servicios de Urgencia por 100.000 Habitantes",
-    subtitle = "Establecimientos vigentes con servicio de urgencia, ajustado por población",
-    x = "Urgencias por 100.000 hab.", y = NULL,
-    caption = "Fuentes: DEIS MINSAL + INE Chile"
+    title    = "Servicios de Urgencia por 100.000 Habitantes",
+    subtitle = "Fuente: DEIS - MINSAL . Marzo 2026 | Establecimientos vigentes con urgencia activa",
+    x        = "Urgencias por 100.000 hab.",
+    y        = NULL,
+    caption  = "Fuentes: DEIS MINSAL . INE Chile"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 13),
-    plot.subtitle = element_text(colour = "grey50"),
-    plot.caption = element_text(colour = "grey60"),
-    panel.grid.major.y = element_blank()
+    plot.title         = element_text(face = "bold", size = 13),
+    plot.subtitle      = element_text(colour = "grey50"),
+    plot.caption       = element_text(colour = "grey60", size = 8),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor   = element_blank(),
+    legend.position    = "bottom"
   )
 ```
 
-> **Hallazgo:** Aysén y Magallanes destacan con la mayor dotación de urgencias per cápita del país, lo que refleja la necesidad de concentrar servicios críticos en territorios donde la distancia al establecimiento más cercano puede ser la diferencia entre la vida y la muerte. En contraste, O'Higgins y la Metropolitana presentan la menor cobertura de urgencia por habitante.
+> 🚨 **Hallazgo:** Aysen y Magallanes lideran la cobertura de urgencias per capita. Sus hospitales cubren emergencias en territorios equivalentes a varios paises europeos. O'Higgins y la Metropolitana presentan los valores mas bajos; el deficit metropolitano se compensa parcialmente con el sector privado, que no esta disponible de forma equitativa para la poblacion FONASA.
 
-# 4. Tabla Resumen Integrada
+---
+
+# 📊 Tabla Resumen de Indicadores
 
 ```{r tabla_integrada}
-df_integrado %>% 
-  select(region_label, n_total, poblacion_2024, superficie_km2, estab_x100k, hab_x_estab, urgencia_x100k, densidad_pob) %>% 
-  arrange(desc(hab_x_estab)) %>% 
+df_integrado |>
+  select(
+    region_label, zona, n_total, poblacion_2024, superficie_km2,
+    estab_x100k, hab_x_estab, urgencia_x100k, densidad_pob
+  ) |>
+  arrange(desc(hab_x_estab)) |>
   mutate(
-    poblacion_2024 = comma(poblacion_2024),
-    superficie_km2 = comma(superficie_km2),
-    estab_x100k = round(estab_x100k, 1),
-    hab_x_estab = comma(round(hab_x_estab)),
-    urgencia_x100k = round(urgencia_x100k, 1),
-    densidad_pob = round(densidad_pob, 1)
-  ) %>% 
+    poblacion_2024  = comma(poblacion_2024),
+    superficie_km2  = comma(superficie_km2),
+    estab_x100k     = round(estab_x100k, 1),
+    hab_x_estab     = comma(round(hab_x_estab)),
+    urgencia_x100k  = round(urgencia_x100k, 1),
+    densidad_pob    = round(densidad_pob, 1)
+  ) |>
   rename(
-    "Región" = region_label,
-    "N establec." = n_total,
-    "Población 2024" = poblacion_2024,
-    "Superficie km²" = superficie_km2,
-    "Estab. 100k hab." = estab_x100k,
-    "Hab./establecimiento" = hab_x_estab,
-    "Urgencias 100k hab." = urgencia_x100k,
-    "Dens. pob. (hab/km²)" = densidad_pob
-  ) %>% 
-  kable(caption = "Tabla 1. Indicadores ajustados de cobertura de salud por región (ordenado por carga asistencial)") %>% 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 12) %>% 
-  row_spec(which(df_integrado %>% arrange(desc(hab_x_estab)) %>% pull(hab_x_estab) > 5000), background = "#fdecea")
+    "Region"                = region_label,
+    "Zona"                  = zona,
+    "N establec."           = n_total,
+    "Poblacion 2024"        = poblacion_2024,
+    "Superficie (km2)"      = superficie_km2,
+    "Estab./100k hab."      = estab_x100k,
+    "Hab./establecimiento"  = hab_x_estab,
+    "Urgencias/100k hab."   = urgencia_x100k,
+    "Dens. pob. (hab/km2)"  = densidad_pob
+  ) |>
+  kable(
+    caption = "Tabla 1. Indicadores ajustados de cobertura sanitaria por region — ordenado por carga asistencial (mayor a menor)",
+    align   = c("l","c","r","r","r","r","r","r","r")
+  ) |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    font_size         = 12
+  ) |>
+  column_spec(7, bold = TRUE) |>
+  row_spec(
+    which(
+      df_integrado |>
+        arrange(desc(hab_x_estab)) |>
+        pull(hab_x_estab) > 5000
+    ),
+    background = "#fdecea",
+    color      = "#7b241c"
+  ) |>
+  footnote(
+    general       = "Filas en rojo: regiones con mas de 5.000 habitantes por establecimiento (alta carga asistencial).",
+    general_title = "Nota:"
+  )
 ```
 
-# 5. Conclusiones
+---
 
-1.  **El conteo bruto invierte la realidad.** La Región Metropolitana, que aparece primera en número absoluto de establecimientos, es en realidad una de las regiones con menor cobertura relativa (12 estab/100k hab.) y la mayor carga asistencial del país (8.000 hab/establecimiento).
-2.  **Las regiones extremas están relativamente bien dotadas per cápita**, gracias a la red de Postas de Salud Rural y hospitales estratégicos, pero la baja densidad territorial hace que el acceso físico siga siendo un desafío real (un alto número de establecimientos por habitante no equivale a cercanía geográfica).
-3.  **Doble vulnerabilidad en zonas rurales densamente pobladas.** Regiones como O'Higgins o Maule combinan una carga asistencial media-alta con menor densidad territorial de establecimientos, sugiriendo una brecha potencial en zonas rurales de esas regiones.
-4.  **La urgencia per cápita revela prioridades del sistema.** Las regiones australes concentran urgencias per cápita porque sus hospitales deben cubrir emergencias para poblaciones dispersas. En contraste, la Metropolitana tiene un déficit relativo de urgencias que se compensa parcialmente con el sector privado (que no siempre está disponible para la población FONASA).
-5.  **Implicancia para políticas públicas.** Una planificación sanitaria equitativa debería incorporar estos indicadores ajustados como estándar, evitando la "ilusión del conteo bruto" que favorece políticamente a las regiones más pobladas. El indicador de habitantes por establecimiento es especialmente relevante para dimensionar brechas de recursos humanos en salud.
+# 🔎 Hallazgos Principales
 
-# 6. Reproducibilidad
+🏙 **Cobertura Poblacional:** La Region Metropolitana, primera en numero absoluto de establecimientos, es en realidad una de las regiones con **menor cobertura relativa** (~12 estab/100k hab.) e invierte completamente el ranking bruto.
+
+🏋 **Carga Asistencial:** La RM registra ~8.000 hab./establecimiento, mas de 4x la media nacional, junto a O'Higgins y Valparaiso. Cada establecimiento absorbe una demanda significativamente mayor en las regiones mas pobladas.
+
+🗺 **Doble Vulnerabilidad Rural:** Regiones como O'Higgins y Maule combinan carga asistencial media-alta con baja densidad territorial de establecimientos, configurando zonas rurales con deficit en ambas dimensiones simultaneamente.
+
+🚨 **Urgencias per capita:** Las regiones australes concentran urgencias per capita porque sus hospitales deben cubrir emergencias para poblaciones dispersas en territorios de escala continental.
+
+📋 **Implicancia para Politicas Publicas:** Una planificacion sanitaria equitativa debe incorporar indicadores ajustados como estandar, complementados con tiempos de traslado y disponibilidad de especialistas. El objetivo no es igualar el numero de establecimientos sino garantizar que ningun habitante este mas alla de un umbral definido de tiempo/distancia de atencion de urgencia.
+
+---
+
+# 🔄 Reproducibilidad
+
+Para reproducir el analisis completo:
+
+1. Clonar el repositorio:
+```
+git clone https://github.com/ignaciocooaravena-sys/-salud-chile-analytics.git
+cd -salud-chile-analytics
+```
+
+2. Descargar el dataset desde [DEIS MINSAL](https://deis.minsal.cl/) y guardarlo como `establecimientos20260303.csv` en la raiz del proyecto.
+
+3. Renderizar el documento R Markdown:
+```r
+rmarkdown::render("salud_chile_analytics.Rmd")
+```
 
 ```{r session_info}
 sessionInfo()
 ```
+
+---
+
+*Ultima actualizacion: `r format(Sys.Date(), '%B %Y')` · Fuente: DEIS – Ministerio de Salud de Chile*
