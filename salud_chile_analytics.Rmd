@@ -19,13 +19,13 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo       = TRUE,
-  warning    = FALSE,
-  message    = FALSE,
-  fig.width  = 10,
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
   fig.height = 6,
-  dpi        = 150,
-  fig.align  = "center"
+  dpi = 150,
+  fig.align = "center"
 )
 ```
 
@@ -72,38 +72,42 @@ Este análisis cruza el **Registro Nacional de Prestadores (DEIS MINSAL, marzo 2
 ## Carga de Librerías
 
 ```{r librerias}
-library(tidyverse)   # manipulación y visualización de datos
+library(tidyverse) # manipulación y visualización de datos
 library(scales)      # formateo de ejes y etiquetas
 library(forcats)     # manejo de factores (fct_reorder, fct_lump)
 library(knitr)       # tablas en el documento
-library(kableExtra)  # estilo profesional de tablas HTML
-library(ggrepel)     # etiquetas sin solapamiento en scatter plots
+library(kableExtra) # estilo profesional de tablas HTML
+library(ggrepel)    # etiquetas sin solapamiento en scatter plots
 library(patchwork)   # composición de múltiples gráficos
 ```
 
 ## Carga y Limpieza de Establecimientos DEIS
 
 ```{r carga_establecimientos}
+# Carga de datos crudos desde DEIS MINSAL
 df_raw <- read.delim(
-  "establecimientos20260303.csv",
-  delim          = ",",
-  locale         = locale(encoding = "UTF-8"),
+  "establecimientos20260303.csv", 
+  delim = ",", 
+  locale = locale(encoding = "UTF-8"), 
   show_col_types = FALSE
 )
 
-df <- df_raw |>
+# Limpieza y clasificación inicial
+df <- df_raw |> 
   mutate(
     urgencia = case_when(
-      TieneServicioUrgencia == "SI"  ~ "Con Urgencia",
-      TieneServicioUrgencia == "NO"  ~ "Sin Urgencia",
-      TRUE                           ~ NA_character_
+      TieneServicioUrgencia == "SI" ~ "Con Urgencia",
+      TieneServicioUrgencia == "NO" ~ "Sin Urgencia",
+      TRUE ~ NA_character_
     ),
     estado = str_to_title(EstadoFuncionamiento)
   )
 
+# Filtro por establecimientos vigentes
 df_vigente <- df |> filter(str_detect(estado, "Vigente"))
 
-cat("Dimensiones del dataset:", nrow(df_raw), "filas ×", ncol(df_raw), "columnas\n")
+cat("Dimensiones del dataset:", nrow(df_raw), "filas ×", ncol(df_raw), "columnas
+")
 cat("Establecimientos vigentes:", nrow(df_vigente), "de", nrow(df), "totales")
 ```
 
@@ -113,36 +117,30 @@ cat("Establecimientos vigentes:", nrow(df_vigente), "de", nrow(df), "totales")
 # Fuente: Proyecciones INE 2024 (base Censo 2017) y BCN-SIIT (superficie regional)
 poblacion_region <- tibble(
   region_csv = c(
-    "Región de Arica y Parinacota", "Región de Tarapacá",
-    "Región de Antofagasta", "Región de Atacama",
-    "Región de Coquimbo", "Región de Valparaíso",
-    "Región Metropolitana de Santiago",
-    "Región del Libertador Gral. B. O'Higgins", "Región del Maule",
-    "Región de Ñuble", "Región del Biobío", "Región de La Araucanía",
-    "Región de Los Ríos", "Región de Los Lagos",
-    "Región de Aysén del General Carlos Ibañez del Campo",
+    "Región de Arica y Parinacota", "Región de Tarapacá", "Región de Antofagasta", 
+    "Región de Atacama", "Región de Coquimbo", "Región de Valparaíso", 
+    "Región Metropolitana de Santiago", "Región del Libertador Gral. B. O'Higgins", 
+    "Región del Maule", "Región de Ñuble", "Región del Biobío", 
+    "Región de La Araucanía", "Región de Los Ríos", "Región de Los Lagos", 
+    "Región de Aysén del General Carlos Ibañez del Campo", 
     "Región de Magallanes y de la Antártica Chilena"
   ),
   region_label = c(
-    "Arica y Parinacota", "Tarapacá", "Antofagasta", "Atacama",
-    "Coquimbo", "Valparaíso", "Metropolitana", "O'Higgins",
-    "Maule", "Ñuble", "Biobío", "La Araucanía",
-    "Los Ríos", "Los Lagos", "Aysén", "Magallanes"
+    "Arica y Parinacota", "Tarapacá", "Antofagasta", "Atacama", "Coquimbo", 
+    "Valparaíso", "Metropolitana", "O'Higgins", "Maule", "Ñuble", "Biobío", 
+    "La Araucanía", "Los Ríos", "Los Lagos", "Aysén", "Magallanes"
   ),
   zona = c(
-    "Norte", "Norte", "Norte", "Norte",
-    "Centro", "Centro", "Centro", "Centro",
-    "Sur", "Sur", "Sur", "Sur", "Sur", "Sur",
-    "Austral", "Austral"
+    "Norte", "Norte", "Norte", "Norte", "Centro", "Centro", "Centro", "Centro",
+    "Sur", "Sur", "Sur", "Sur", "Sur", "Sur", "Austral", "Austral"
   ),
   poblacion_2024 = c(
-    261779, 406287, 718232, 319992, 879267, 2025693, 8420729,
-    1025586, 1171982, 521711, 1686225, 1032164, 412786, 912171,
-    108538, 183235
+    261779, 406287, 718232, 319992, 879267, 2025693, 8420729, 1025586, 
+    1171982, 521711, 1686225, 1032164, 412786, 912171, 108538, 183235
   ),
   superficie_km2 = c(
-    16873, 42226, 126049, 75176, 40580, 16396, 15403, 16387,
-    30296, 13178, 23865, 31842, 18430, 48584, 108494, 132291
+    16873, 42226, 126049, 75176, 40580, 16396, 15403, 16387, 30296, 
+    13178, 23865, 31842, 18430, 48584, 108494, 132291
   )
 )
 ```
@@ -151,36 +149,36 @@ poblacion_region <- tibble(
 
 ```{r integracion}
 # Consolidar variantes de nombre de región en el CSV
-df_vigente_clean <- df_vigente |>
+df_vigente_clean <- df_vigente |> 
   mutate(region_csv = case_when(
-    str_detect(RegionGlosa, "Aysén|Aysen")          ~ "Región de Aysén del General Carlos Ibañez del Campo",
-    str_detect(RegionGlosa, "Coquimbo")              ~ "Región de Coquimbo",
-    str_detect(RegionGlosa, "Los Ríos|Los Rios")     ~ "Región de Los Ríos",
+    str_detect(RegionGlosa, "Aysén|Aysen") ~ "Región de Aysén del General Carlos Ibañez del Campo",
+    str_detect(RegionGlosa, "Coquimbo") ~ "Región de Coquimbo",
+    str_detect(RegionGlosa, "Los Ríos|Los Rios") ~ "Región de Los Ríos",
     str_detect(RegionGlosa, "Biobío|Biobio|Bio Bio") ~ "Región del Biobío",
-    TRUE                                             ~ RegionGlosa
+    TRUE ~ RegionGlosa
   ))
 
 # Contar por región
-establecimientos_region <- df_vigente_clean |>
-  group_by(region_csv) |>
+establecimientos_region <- df_vigente_clean |> 
+  group_by(region_csv) |> 
   summarise(
-    n_total      = n(),
+    n_total = n(),
     n_hospitales = sum(TipoEstablecimientoGlosa == "Hospital"),
-    n_cesfam     = sum(TipoEstablecimientoGlosa == "Centro de Salud Familiar (CESFAM)"),
-    n_psr        = sum(TipoEstablecimientoGlosa == "Posta de Salud Rural (PSR)"),
-    n_urgencia   = sum(urgencia == "Con Urgencia", na.rm = TRUE),
-    .groups      = "drop"
+    n_cesfam = sum(TipoEstablecimientoGlosa == "Centro de Salud Familiar (CESFAM)"),
+    n_psr = sum(TipoEstablecimientoGlosa == "Posta de Salud Rural (PSR)"),
+    n_urgencia = sum(urgencia == "Con Urgencia", na.rm = TRUE),
+    .groups = "drop"
   )
 
 # Join con datos demográficos y cálculo de indicadores
-df_integrado <- establecimientos_region |>
-  left_join(poblacion_region, by = "region_csv") |>
+df_integrado <- establecimientos_region |> 
+  left_join(poblacion_region, by = "region_csv") |> 
   mutate(
-    estab_x100k     = (n_total    / poblacion_2024) * 100000,
-    hab_x_estab     =  poblacion_2024 / n_total,
-    estab_x_1000km2 = (n_total    / superficie_km2) * 1000,
-    urgencia_x100k  = (n_urgencia / poblacion_2024) * 100000,
-    densidad_pob    =  poblacion_2024 / superficie_km2
+    estab_x100k = (n_total / poblacion_2024) * 100000,
+    hab_x_estab = poblacion_2024 / n_total,
+    estab_x_1000km2 = (n_total / superficie_km2) * 1000,
+    urgencia_x100k = (n_urgencia / poblacion_2024) * 100000,
+    densidad_pob = poblacion_2024 / superficie_km2
   )
 
 cat("Dimensiones del dataset integrado:", nrow(df_integrado), "filas ×", ncol(df_integrado), "columnas")
@@ -195,56 +193,59 @@ cat("Dimensiones del dataset integrado:", nrow(df_integrado), "filas ×", ncol(d
 ```{r plot_estab_x100k, fig.height=7}
 prom_nacional <- mean(df_integrado$estab_x100k)
 
-df_integrado |>
+df_integrado |> 
   mutate(
     region_label = fct_reorder(region_label, estab_x100k),
     grupo = case_when(
       estab_x100k > quantile(estab_x100k, 0.75) ~ "Alta cobertura",
       estab_x100k < quantile(estab_x100k, 0.25) ~ "Baja cobertura",
-      TRUE                                       ~ "Cobertura media"
+      TRUE ~ "Cobertura media"
     )
-  ) |>
+  ) |> 
   ggplot(aes(x = estab_x100k, y = region_label, fill = grupo)) +
   geom_col(width = 0.7, show.legend = TRUE) +
   geom_vline(
-    xintercept = prom_nacional,
-    linetype = "dashed", colour = "grey35", linewidth = 0.7
+    xintercept = prom_nacional, 
+    linetype = "dashed", 
+    colour = "grey35", 
+    linewidth = 0.7
   ) +
   geom_text(
-    aes(label = round(estab_x100k, 1)),
-    hjust = -0.2, size = 3.2, colour = "grey20"
+    aes(label = round(estab_x100k, 1)), 
+    hjust = -0.2, 
+    size = 3.2, 
+    colour = "grey20"
   ) +
   annotate(
-    "label",
-    x = prom_nacional + 0.5, y = 2,
-    label = paste0("Promedio país\n", round(prom_nacional, 1), " estab/100k"),
-    hjust = 0, size = 2.8, colour = "grey35",
-    fill = "white", label.size = 0.3
+    "label", x = prom_nacional + 0.5, y = 2, 
+    label = paste0("Promedio país
+", round(prom_nacional, 1), " estab/100k"),
+    hjust = 0, size = 2.8, colour = "grey35", fill = "white", label.size = 0.3
   ) +
   scale_fill_manual(
     values = c(
-      "Alta cobertura"  = "#1e8449",
+      "Alta cobertura" = "#1e8449",
       "Cobertura media" = "#2471a3",
-      "Baja cobertura"  = "#c0392b"
+      "Baja cobertura" = "#c0392b"
     ),
     name = NULL
   ) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
   labs(
-    title    = "Establecimientos de Salud Vigentes por 100.000 Habitantes",
+    title = "Establecimientos de Salud Vigentes por 100.000 Habitantes",
     subtitle = "Fuente: DEIS – MINSAL · Marzo 2026 + proyección poblacional INE 2024",
-    x        = "Establecimientos por 100.000 hab.",
-    y        = NULL,
-    caption  = "Fuentes: DEIS MINSAL · INE Chile · BCN-SIIT"
+    x = "Establecimientos por 100.000 hab.",
+    y = NULL,
+    caption = "Fuentes: DEIS MINSAL · INE Chile · BCN-SIIT"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title         = element_text(face = "bold", size = 13),
-    plot.subtitle      = element_text(colour = "grey50"),
-    plot.caption       = element_text(colour = "grey60", size = 8),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(colour = "grey50"),
+    plot.caption = element_text(colour = "grey60", size = 8),
     panel.grid.major.y = element_blank(),
-    panel.grid.minor   = element_blank(),
-    legend.position    = "bottom"
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
   )
 ```
 
@@ -257,58 +258,59 @@ df_integrado |>
 ```{r plot_hab_x_estab, fig.height=7}
 media_hab <- mean(df_integrado$hab_x_estab)
 
-df_integrado |>
+df_integrado |> 
   mutate(
     region_label = fct_reorder(region_label, hab_x_estab),
-    sobre_media  = hab_x_estab > media_hab
-  ) |>
+    sobre_media = hab_x_estab > media_hab
+  ) |> 
   ggplot(aes(x = hab_x_estab, y = region_label)) +
   geom_segment(
-    aes(x = 0, xend = hab_x_estab,
-        y = region_label, yend = region_label,
-        colour = sobre_media),
+    aes(x = 0, xend = hab_x_estab, y = region_label, yend = region_label, colour = sobre_media),
     linewidth = 1.3
   ) +
   geom_point(aes(colour = sobre_media), size = 4) +
   geom_text(
-    aes(label = comma(round(hab_x_estab))),
-    hjust = -0.25, size = 3.1, colour = "grey20"
+    aes(label = comma(round(hab_x_estab))), 
+    hjust = -0.25, 
+    size = 3.1, 
+    colour = "grey20"
   ) +
   geom_vline(
-    xintercept = media_hab,
-    linetype = "dashed", colour = "grey35", linewidth = 0.7
+    xintercept = media_hab, 
+    linetype = "dashed", 
+    colour = "grey35", 
+    linewidth = 0.7
   ) +
   annotate(
-    "label",
-    x = media_hab + 100, y = 2,
-    label = paste0("Media país\n", comma(round(media_hab)), " hab/estab"),
-    hjust = 0, size = 2.8, colour = "grey35",
-    fill = "white", label.size = 0.3
+    "label", x = media_hab + 100, y = 2, 
+    label = paste0("Media país
+", comma(round(media_hab)), " hab/estab"),
+    hjust = 0, size = 2.8, colour = "grey35", fill = "white", label.size = 0.3
   ) +
   scale_colour_manual(
     values = c("TRUE" = "#c0392b", "FALSE" = "#2471a3"),
     labels = c("TRUE" = "Sobre la media", "FALSE" = "Bajo la media"),
-    name   = NULL
+    name = NULL
   ) +
   scale_x_continuous(
     expand = expansion(mult = c(0, 0.2)),
     labels = comma
   ) +
   labs(
-    title    = "Carga Asistencial: Habitantes por Establecimiento de Salud",
+    title = "Carga Asistencial: Habitantes por Establecimiento de Salud",
     subtitle = "Fuente: DEIS – MINSAL · Marzo 2026 | A mayor valor, mayor presión sobre cada centro",
-    x        = "Habitantes por establecimiento",
-    y        = NULL,
-    caption  = "Fuentes: DEIS MINSAL · INE Chile"
+    x = "Habitantes por establecimiento",
+    y = NULL,
+    caption = "Fuentes: DEIS MINSAL · INE Chile"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title         = element_text(face = "bold", size = 13),
-    plot.subtitle      = element_text(colour = "grey50"),
-    plot.caption       = element_text(colour = "grey60", size = 8),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(colour = "grey50"),
+    plot.caption = element_text(colour = "grey60", size = 8),
     panel.grid.major.y = element_blank(),
-    panel.grid.minor   = element_blank(),
-    legend.position    = "bottom"
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
   )
 ```
 
@@ -319,39 +321,41 @@ df_integrado |>
 ## 🗺️ Densidad Territorial de Establecimientos
 
 ```{r plot_densidad_territorial, fig.height=7}
-df_integrado |>
-  mutate(region_label = fct_reorder(region_label, estab_x_1000km2)) |>
+df_integrado |> 
+  mutate(region_label = fct_reorder(region_label, estab_x_1000km2)) |> 
   ggplot(aes(x = estab_x_1000km2, y = region_label, fill = zona)) +
   geom_col(width = 0.7) +
   geom_text(
-    aes(label = round(estab_x_1000km2, 1)),
-    hjust = -0.15, size = 3.2, colour = "grey20"
+    aes(label = round(estab_x_1000km2, 1)), 
+    hjust = -0.15, 
+    size = 3.2, 
+    colour = "grey20"
   ) +
   scale_fill_manual(
     values = c(
-      "Norte"   = "#e59866",
-      "Centro"  = "#2e86c1",
-      "Sur"     = "#1e8449",
+      "Norte" = "#e59866",
+      "Centro" = "#2e86c1",
+      "Sur" = "#1e8449",
       "Austral" = "#8e44ad"
     ),
     name = "Zona"
   ) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
   labs(
-    title    = "Densidad Territorial de Establecimientos de Salud",
+    title = "Densidad Territorial de Establecimientos de Salud",
     subtitle = "Fuente: DEIS – MINSAL · Marzo 2026 | Establecimientos por 1.000 km²",
-    x        = "Establecimientos por 1.000 km²",
-    y        = NULL,
-    caption  = "Fuentes: DEIS MINSAL · BCN-SIIT (superficie regional)"
+    x = "Establecimientos por 1.000 km²",
+    y = NULL,
+    caption = "Fuentes: DEIS MINSAL · BCN-SIIT (superficie regional)"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title         = element_text(face = "bold", size = 13),
-    plot.subtitle      = element_text(colour = "grey50"),
-    plot.caption       = element_text(colour = "grey60", size = 8),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(colour = "grey50"),
+    plot.caption = element_text(colour = "grey60", size = 8),
     panel.grid.major.y = element_blank(),
-    panel.grid.minor   = element_blank(),
-    legend.position    = "right"
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
   )
 ```
 
@@ -362,27 +366,27 @@ df_integrado |>
 ## 🏨 Composición de la Red Asistencial por Región
 
 ```{r plot_composicion_tipo, fig.height=7}
-df_integrado |>
-  select(region_label, n_hospitales, n_cesfam, n_psr) |>
+df_integrado |> 
+  select(region_label, n_hospitales, n_cesfam, n_psr) |> 
   pivot_longer(
-    cols      = c(n_hospitales, n_cesfam, n_psr),
-    names_to  = "tipo",
+    cols = c(n_hospitales, n_cesfam, n_psr),
+    names_to = "tipo",
     values_to = "n"
-  ) |>
+  ) |> 
   mutate(
-    tipo = recode(tipo,
-      n_hospitales = "Hospitales",
-      n_cesfam     = "CESFAM",
-      n_psr        = "Postas de Salud Rural"
+    tipo = recode(tipo, 
+                  n_hospitales = "Hospitales",
+                  n_cesfam = "CESFAM",
+                  n_psr = "Postas de Salud Rural"
     ),
     region_label = fct_reorder(region_label, n, .fun = sum)
-  ) |>
+  ) |> 
   ggplot(aes(x = n, y = region_label, fill = tipo)) +
   geom_col(position = "stack", width = 0.7) +
   scale_fill_manual(
     values = c(
-      "Hospitales"            = "#1a5276",
-      "CESFAM"                = "#2e86c1",
+      "Hospitales" = "#1a5276",
+      "CESFAM" = "#2e86c1",
       "Postas de Salud Rural" = "#85c1e9"
     ),
     name = NULL
@@ -392,20 +396,20 @@ df_integrado |>
     labels = comma
   ) +
   labs(
-    title    = "Composición de la Red Asistencial por Región",
+    title = "Composición de la Red Asistencial por Región",
     subtitle = "Fuente: DEIS – MINSAL · Marzo 2026 | Hospitales, CESFAM y Postas de Salud Rural",
-    x        = "Nº de establecimientos",
-    y        = NULL,
-    caption  = "Fuente: DEIS MINSAL (marzo 2026)"
+    x = "Nº de establecimientos",
+    y = NULL,
+    caption = "Fuente: DEIS MINSAL (marzo 2026)"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title         = element_text(face = "bold", size = 13),
-    plot.subtitle      = element_text(colour = "grey50"),
-    plot.caption       = element_text(colour = "grey60", size = 8),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(colour = "grey50"),
+    plot.caption = element_text(colour = "grey60", size = 8),
     panel.grid.major.y = element_blank(),
-    panel.grid.minor   = element_blank(),
-    legend.position    = "bottom"
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
   )
 ```
 
@@ -416,54 +420,52 @@ df_integrado |>
 ## 📈 Relación entre Densidad Poblacional y Cobertura de Salud
 
 ```{r scatter_disparidad, fig.width=11, fig.height=7}
-df_integrado |>
+df_integrado |> 
   ggplot(aes(
-    x      = densidad_pob,
-    y      = estab_x100k,
-    size   = poblacion_2024,
+    x = densidad_pob, 
+    y = estab_x100k, 
+    size = poblacion_2024, 
     colour = urgencia_x100k,
-    label  = region_label
+    label = region_label
   )) +
   geom_smooth(
-    method = "lm", se = TRUE,
-    colour = "grey60", fill = "grey90",
-    linewidth = 0.8, show.legend = FALSE
+    method = "lm", se = TRUE, 
+    colour = "grey60", fill = "grey90", linewidth = 0.8, 
+    show.legend = FALSE
   ) +
   geom_point(alpha = 0.85) +
   geom_text_repel(
-    size = 3.2, colour = "grey20",
-    box.padding = 0.5, point.padding = 0.3,
+    size = 3.2, colour = "grey20", 
+    box.padding = 0.5, point.padding = 0.3, 
     max.overlaps = 20
   ) +
-  annotate("text", x = 4,    y = 1.5,
-    label = "Baja densidad\nAlta cobertura",
-    colour = "#1e8449", size = 2.8, fontface = "italic") +
-  annotate("text", x = 2500, y = 1.5,
-    label = "Alta densidad\nBaja cobertura",
-    colour = "#c0392b", size = 2.8, fontface = "italic") +
+  annotate("text", x = 4, y = 1.5, label = "Baja densidad
+Alta cobertura", colour = "#1e8449", size = 2.8, fontface = "italic") +
+  annotate("text", x = 2500, y = 1.5, label = "Alta densidad
+Baja cobertura", colour = "#c0392b", size = 2.8, fontface = "italic") +
   scale_x_log10(labels = comma, breaks = c(1, 5, 10, 50, 100, 500)) +
   scale_colour_gradient(
-    low  = "#aab7b8",
-    high = "#c0392b",
-    name = "Urgencias/\n100k hab."
+    low = "#aab7b8", high = "#c0392b",
+    name = "Urgencias/
+100k hab."
   ) +
   scale_size_continuous(
-    range  = c(3, 15),
-    labels = comma,
-    name   = "Población 2024"
+    range = c(3, 15), 
+    labels = comma, 
+    name = "Población 2024"
   ) +
   labs(
-    title    = "Relación entre Densidad Poblacional y Cobertura de Salud por Región",
+    title = "Relación entre Densidad Poblacional y Cobertura de Salud por Región",
     subtitle = "Fuente: DEIS – MINSAL · INE · BCN-SIIT | Eje X en escala logarítmica",
-    x        = "Densidad poblacional (hab/km², escala logarítmica)",
-    y        = "Establecimientos por 100.000 hab.",
-    caption  = "Fuentes: DEIS MINSAL · INE Chile · BCN-SIIT"
+    x = "Densidad poblacional (hab/km², escala logarítmica)",
+    y = "Establecimientos por 100.000 hab.",
+    caption = "Fuentes: DEIS MINSAL · INE Chile · BCN-SIIT"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title      = element_text(face = "bold", size = 13),
-    plot.subtitle   = element_text(colour = "grey50"),
-    plot.caption    = element_text(colour = "grey60", size = 8),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(colour = "grey50"),
+    plot.caption = element_text(colour = "grey60", size = 8),
     legend.position = "right"
   )
 ```
@@ -477,55 +479,56 @@ df_integrado |>
 ```{r plot_urgencia_ajustada, fig.height=7}
 media_urg <- mean(df_integrado$urgencia_x100k)
 
-df_integrado |>
+df_integrado |> 
   mutate(
     region_label = fct_reorder(region_label, urgencia_x100k),
-    sobre_media  = urgencia_x100k > media_urg
-  ) |>
+    sobre_media = urgencia_x100k > media_urg
+  ) |> 
   ggplot(aes(x = urgencia_x100k, y = region_label)) +
   geom_segment(
-    aes(x = 0, xend = urgencia_x100k,
-        y = region_label, yend = region_label,
-        colour = sobre_media),
+    aes(x = 0, xend = urgencia_x100k, y = region_label, yend = region_label, colour = sobre_media),
     linewidth = 1.3
   ) +
   geom_point(aes(colour = sobre_media), size = 4) +
   geom_text(
-    aes(label = round(urgencia_x100k, 1)),
-    hjust = -0.3, size = 3.1, colour = "grey20"
+    aes(label = round(urgencia_x100k, 1)), 
+    hjust = -0.3, 
+    size = 3.1, 
+    colour = "grey20"
   ) +
   geom_vline(
-    xintercept = media_urg,
-    linetype = "dashed", colour = "grey35", linewidth = 0.7
+    xintercept = media_urg, 
+    linetype = "dashed", 
+    colour = "grey35", 
+    linewidth = 0.7
   ) +
   annotate(
-    "label",
-    x = media_urg + 0.2, y = 2,
-    label = paste0("Media país\n", round(media_urg, 1), " urg/100k"),
-    hjust = 0, size = 2.8, colour = "grey35",
-    fill = "white", label.size = 0.3
+    "label", x = media_urg + 0.2, y = 2, 
+    label = paste0("Media país
+", round(media_urg, 1), " urg/100k"),
+    hjust = 0, size = 2.8, colour = "grey35", fill = "white", label.size = 0.3
   ) +
   scale_colour_manual(
     values = c("TRUE" = "#c0392b", "FALSE" = "#aab7b8"),
     labels = c("TRUE" = "Sobre la media", "FALSE" = "Bajo la media"),
-    name   = NULL
+    name = NULL
   ) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
   labs(
-    title    = "Servicios de Urgencia por 100.000 Habitantes",
+    title = "Servicios de Urgencia por 100.000 Habitantes",
     subtitle = "Fuente: DEIS – MINSAL · Marzo 2026 | Establecimientos vigentes con urgencia activa",
-    x        = "Urgencias por 100.000 hab.",
-    y        = NULL,
-    caption  = "Fuentes: DEIS MINSAL · INE Chile"
+    x = "Urgencias por 100.000 hab.",
+    y = NULL,
+    caption = "Fuentes: DEIS MINSAL · INE Chile"
   ) +
   theme_minimal(base_size = 11) +
   theme(
-    plot.title         = element_text(face = "bold", size = 13),
-    plot.subtitle      = element_text(colour = "grey50"),
-    plot.caption       = element_text(colour = "grey60", size = 8),
+    plot.title = element_text(face = "bold", size = 13),
+    plot.subtitle = element_text(colour = "grey50"),
+    plot.caption = element_text(colour = "grey60", size = 8),
     panel.grid.major.y = element_blank(),
-    panel.grid.minor   = element_blank(),
-    legend.position    = "bottom"
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom"
   )
 ```
 
@@ -536,51 +539,50 @@ df_integrado |>
 # 📊 Tabla Resumen de Indicadores
 
 ```{r tabla_integrada}
-df_integrado |>
+df_integrado |> 
   select(
-    region_label, zona, n_total, poblacion_2024, superficie_km2,
+    region_label, zona, n_total, poblacion_2024, superficie_km2, 
     estab_x100k, hab_x_estab, urgencia_x100k, densidad_pob
-  ) |>
-  arrange(desc(hab_x_estab)) |>
+  ) |> 
+  arrange(desc(hab_x_estab)) |> 
   mutate(
-    poblacion_2024  = comma(poblacion_2024),
-    superficie_km2  = comma(superficie_km2),
-    estab_x100k     = round(estab_x100k, 1),
-    hab_x_estab     = comma(round(hab_x_estab)),
-    urgencia_x100k  = round(urgencia_x100k, 1),
-    densidad_pob    = round(densidad_pob, 1)
-  ) |>
+    poblacion_2024 = comma(poblacion_2024),
+    superficie_km2 = comma(superficie_km2),
+    estab_x100k = round(estab_x100k, 1),
+    hab_x_estab = comma(round(hab_x_estab)),
+    urgencia_x100k = round(urgencia_x100k, 1),
+    densidad_pob = round(densidad_pob, 1)
+  ) |> 
   rename(
-    "Región"                = region_label,
-    "Zona"                  = zona,
-    "Nº establec."          = n_total,
-    "Población 2024"        = poblacion_2024,
-    "Superficie (km²)"      = superficie_km2,
-    "Estab./100k hab."      = estab_x100k,
-    "Hab./establecimiento"  = hab_x_estab,
-    "Urgencias/100k hab."   = urgencia_x100k,
-    "Dens. pob. (hab/km²)"  = densidad_pob
-  ) |>
+    "Región" = region_label,
+    "Zona" = zona,
+    "Nº establec." = n_total,
+    "Población 2024" = poblacion_2024,
+    "Superficie (km²)" = superficie_km2,
+    "Estab./100k hab." = estab_x100k,
+    "Hab./establecimiento" = hab_x_estab,
+    "Urgencias/100k hab." = urgencia_x100k,
+    "Dens. pob. (hab/km²)" = densidad_pob
+  ) |> 
   kable(
     caption = "Tabla 1. Indicadores ajustados de cobertura sanitaria por región — ordenado por carga asistencial (mayor a menor)",
-    align   = c("l","c","r","r","r","r","r","r","r")
-  ) |>
+    align = c("l","c","r","r","r","r","r","r","r")
+  ) |> 
   kable_styling(
     bootstrap_options = c("striped", "hover", "condensed"),
-    font_size         = 12
-  ) |>
-  column_spec(7, bold = TRUE) |>
+    font_size = 12
+  ) |> 
+  column_spec(7, bold = TRUE) |> 
   row_spec(
     which(
-      df_integrado |>
-        arrange(desc(hab_x_estab)) |>
+      df_integrado |> 
+        arrange(desc(hab_x_estab)) |> 
         pull(hab_x_estab) > 5000
-    ),
-    background = "#fdecea",
-    color      = "#7b241c"
-  ) |>
+    ), 
+    background = "#fdecea", color = "#7b241c"
+  ) |> 
   footnote(
-    general       = "Filas en rojo: regiones con más de 5.000 habitantes por establecimiento (alta carga asistencial).",
+    general = "Filas en rojo: regiones con más de 5.000 habitantes por establecimiento (alta carga asistencial).",
     general_title = "Nota:"
   )
 ```
@@ -606,22 +608,19 @@ df_integrado |>
 Para reproducir el análisis completo:
 
 1. Clonar el repositorio:
-```
-git clone https://github.com/ignaciocooaravena-sys/-salud-chile-analytics.git
-cd -salud-chile-analytics
-```
-
+   ```
+   git clone https://github.com/ignaciocooaravena-sys/-salud-chile-analytics.git
+   cd -salud-chile-analytics
+   ```
 2. Descargar el dataset desde [DEIS MINSAL](https://deis.minsal.cl/) y guardarlo como `establecimientos20260303.csv` en la raíz del proyecto.
-
 3. Renderizar el documento R Markdown:
-```r
-rmarkdown::render("salud_chile_analytics.Rmd")
-```
+   ```r
+   rmarkdown::render("salud_chile_analytics.Rmd")
+   ```
 
 ```{r session_info}
 sessionInfo()
 ```
 
 ---
-
 *Última actualización: `r format(Sys.Date(), '%B %Y')` · Fuente: DEIS – Ministerio de Salud de Chile*
