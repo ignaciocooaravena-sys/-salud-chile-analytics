@@ -59,10 +59,17 @@ Análisis descriptivo de la red de establecimientos de salud pública y privada 
 
 #### Visualizaciones
 
-| | |
-|---|---|
-| Distribución por Región | Dependencia Administrativa |
-| Tipos de Establecimiento | Urgencia por Región |
+##### 1. Establecimientos de Salud Vigentes por Región
+![Distribución por Región](01_establecimientos_region.png)
+
+##### 2. Dependencia Administrativa por Región
+![Dependencia Administrativa](02_dependencia_region.png)
+
+##### 3. Top 15 Tipos de Establecimiento
+![Tipos de Establecimiento](03_tipos_establecimiento.png)
+
+##### 4. Cobertura de Urgencia por Región
+![Urgencia por Región](04_urgencia_region.png)
 
 ---
 
@@ -251,3 +258,4 @@ Enfermero Universitario | Study Nurse en Investigación Clínica Fase I | Data S
 
 ---
 *Última actualización: Marzo 2026 | Fuentes: DEIS/MINSAL, INE Chile, BCN-SIIT*
+
