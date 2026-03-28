@@ -73,7 +73,7 @@ Análisis descriptivo de la red de establecimientos de salud pública y privada 
 
 ---
 
-### 2. Disparidades Territoriales en Salud ✨ NUEVO
+### 2. Disparidades Territoriales en Salud 
 
 **Archivo:** `salud_chile_disparidades.Rmd`
 
